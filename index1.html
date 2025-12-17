@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Partículas 3D - Universal</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #020205;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: white;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #input_video {
+            position: absolute;
+            width: 1px; height: 1px; 
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* --- UI PANEL --- */
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 240px;
+            padding: 15px;
+            background: rgba(20, 20, 35, 0.85);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            z-index: 10;
+            display: none;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        /* Ajuste para celulares pequeños */
+        @media (max-width: 600px) {
+            #ui-panel {
+                width: calc(100% - 40px);
+                top: auto;
+                bottom: 20px;
+                left: 20px;
+            }
+            .instructions {
+                bottom: auto !important;
+                top: 20px;
+            }
+        }
+
+        h2 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 8px;
+        }
+
+        .control-group { margin-bottom: 12px; }
+
+        label {
+            display: block;
+            font-size: 10px;
+            margin-bottom: 4px;
+            color: #bbb;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        select, input[type="color"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            font-size: 14px;
+            outline: none;
+        }
+        
+        input[type="color"] {
+            height: 40px;
+            padding: 2px;
+            cursor: pointer;
+        }
+
+        /* --- PANTALLA DE INICIO --- */
+        #start-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .start-btn {
+            background: linear-gradient(45deg, #00aaff, #00ff88);
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #000;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+            transition: transform 0.2s;
+            text-transform: uppercase;
+            margin-top: 20px;
+        }
+
+        .start-btn:active { transform: scale(0.95); }
+
+        .error-msg {
+            color: #ff5555;
+            background: rgba(50, 0, 0, 0.5);
+            border: 1px solid #ff5555;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-top: 20px;
+            max-width: 400px;
+            display: none;
+            line-height: 1.4;
+        }
+
+        /* --- INSTRUCCIONES --- */
+        .instructions {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            z-index: 5;
+            pointer-events: none;
+            display: none;
+        }
+        
+        .instruction-tag {
+            display: inline-block;
+            background: rgba(0,0,0,0.6);
+            padding: 5px 10px;
+            border-radius: 15px;
+            margin: 0 3px;
+            font-size: 10px;
+            color: #ddd;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        #loading {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #00aaff;
+            display: none;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse { 0% { opacity: 0.5; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <video id="input_video" playsinline muted></video>
+
+    <!-- Pantalla de Inicio -->
+    <div id="start-screen">
+        <h1 style="margin-bottom: 5px; font-size: 24px;">Universo Gestual</h1>
+        <p style="font-size: 14px; color: #aaa; max-width: 300px;">
+            Controla partículas 3D con tus manos.<br>Funciona en PC, Tablet y Celular.
+        </p>
+        
+        <button class="start-btn" id="btn-start">📷 INICIAR CÁMARA</button>
+        
+        <div id="loading">Conectando con la cámara y cargando IA...</div>
+        
+        <div class="error-msg" id="error-message">
+            <!-- El mensaje de error se inyectará aquí -->
+        </div>
+    </div>
+
+    <!-- Panel de Control -->
+    <div id="ui-panel">
+        <h2>Personalización</h2>
+        
+        <div class="control-group">
+            <label>Forma</label>
+            <select id="shape-selector">
+                <option value="galaxy">🌌 Galaxia Espiral</option>
+                <option value="world">🌎 Mundo</option>
+                <option value="sphere">🔮 Esfera</option>
+                <option value="saturn">🪐 Saturno</option>
+                <option value="heart">❤️ Corazón</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>Color (Tú decides)</label>
+            <input type="color" id="color-picker" value="#00aaff">
+        </div>
+
+        <div style="font-size: 10px; color: #888; margin-top: 10px;">
+            Estado: <span id="status-text" style="color: #fff">Esperando manos...</span>
+        </div>
+    </div>
+
+    <div class="instructions" id="instructions">
+        <div class="instruction-tag">↔️ Zoom (Dos manos)</div>
+        <div class="instruction-tag">👋 Rotar (Mover)</div>
+        <div class="instruction-tag">✊ Colapsar (Puño)</div>
+    </div>
+
+    <!-- Librerías -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <script>
+        // --- 1. CONFIGURACIÓN ---
+        const PARTICLE_COUNT = 15000;
+        const PARTICLE_SIZE = 0.18;
+        let CURRENT_SHAPE = 'galaxy';
+        let BASE_COLOR = new THREE.Color(0x00aaff); 
+
+        // --- THREE.JS SETUP ---
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x020205, 0.02);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 40;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.body.appendChild(renderer.domElement);
+
+        // --- PARTÍCULAS ---
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(PARTICLE_COUNT * 3);
+        const targetPositions = new Float32Array(PARTICLE_COUNT * 3);
+        
+        for(let i=0; i<PARTICLE_COUNT*3; i++) {
+            positions[i] = (Math.random() - 0.5) * 100;
+            targetPositions[i] = positions[i];
+        }
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+        const getTexture = () => {
+            const c = document.createElement('canvas');
+            c.width = 32; c.height = 32;
+            const ctx = c.getContext('2d');
+            const g = ctx.createRadialGradient(16,16,0,16,16,16);
+            g.addColorStop(0,'rgba(255,255,255,1)');
+            g.addColorStop(0.4,'rgba(255,255,255,0.3)');
+            g.addColorStop(1,'rgba(0,0,0,0)');
+            ctx.fillStyle = g; ctx.fillRect(0,0,32,32);
+            return new THREE.Texture(c);
+        }
+        const tex = getTexture(); tex.needsUpdate = true;
+
+        const material = new THREE.PointsMaterial({
+            size: PARTICLE_SIZE,
+            map: tex,
+            transparent: true,
+            opacity: 0.9,
+            color: BASE_COLOR,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+
+        const particles = new THREE.Points(geometry, material);
+        scene.add(particles);
+
+        // --- MATEMÁTICAS ---
+        function getSpherePoint(r) {
+            const u = Math.random(), v = Math.random();
+            const t = 2 * Math.PI * u, p = Math.acos(2 * v - 1);
+            return { x: r * Math.sin(p)*Math.cos(t), y: r*Math.sin(p)*Math.sin(t), z: r*Math.cos(p) };
+        }
+
+        function updateShape() {
+            for (let i = 0; i < PARTICLE_COUNT; i++) {
+                let p;
+                
+                if (CURRENT_SHAPE === 'galaxy') {
+                    const arms = 3;
+                    const spin = i % arms;
+                    const r = Math.random() * Math.random() * 18;
+                    const angle = (spin * 2 * Math.PI / arms) + (r * 0.5);
+                    const spread = 0.5 + r * 0.1;
+                    p = {
+                        x: (r * Math.cos(angle)) + (Math.random()-0.5)*spread,
+                        y: (Math.random()-0.5) * (4-r*0.2),
+                        z: (r * Math.sin(angle)) + (Math.random()-0.5)*spread
+                    };
+                }
+                else if (CURRENT_SHAPE === 'world') {
+                    p = getSpherePoint(9);
+                    if(Math.sin(p.x*0.4) + Math.cos(p.y*0.4) + Math.sin(p.z*0.4) < -0.4) {
+                        p.x *= 0.98; p.y *= 0.98; p.z *= 0.98;
+                    }
+                }
+                else if (CURRENT_SHAPE === 'heart') {
+                    const t = (i/PARTICLE_COUNT) * Math.PI * 2 * 10;
+                    const scale = 0.7;
+                    p = {
+                        x: scale * 16 * Math.pow(Math.sin(t), 3),
+                        y: scale * (13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t)),
+                        z: (Math.random()-0.5)*5
+                    };
+                }
+                else if (CURRENT_SHAPE === 'saturn') {
+                    if(Math.random() > 0.4) {
+                        const ang = Math.random()*Math.PI*2;
+                        const rad = 12 + Math.random()*6;
+                        p = { x: Math.cos(ang)*rad, y: (Math.random()-0.5)*0.5, z: Math.sin(ang)*rad };
+                    } else p = getSpherePoint(6);
+                }
+                else { p = getSpherePoint(9); }
+
+                targetPositions[i*3] = p.x;
+                targetPositions[i*3+1] = p.y;
+                targetPositions[i*3+2] = p.z;
+            }
+        }
+        updateShape();
+
+        // --- EVENTOS UI ---
+        document.getElementById('shape-selector').addEventListener('change', (e) => {
+            CURRENT_SHAPE = e.target.value;
+            updateShape();
+        });
+
+        document.getElementById('color-picker').addEventListener('input', (e) => {
+            BASE_COLOR.set(e.target.value);
+            material.color = BASE_COLOR;
+        });
+
+        // --- CONTROL GESTUAL Y CÁMARA ---
+        let targetRotX = 0, targetRotY = 0;
+        let currentRotX = 0, currentRotY = 0;
+        let targetCamZ = 40, currentCamZ = 40;
+        let handTension = 0;
+
+        const videoElement = document.getElementById('input_video');
+        const startBtn = document.getElementById('btn-start');
+        const loadingText = document.getElementById('loading');
+        const errorMsg = document.getElementById('error-message');
+        const startScreen = document.getElementById('start-screen');
+        
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        
+        hands.setOptions({
+            maxNumHands: 2,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        hands.onResults((results) => {
+            // Ocultar carga si hay éxito
+            if(startScreen.style.display !== 'none') {
+                startScreen.style.opacity = 0;
+                setTimeout(() => { 
+                    startScreen.style.display = 'none';
+                    document.getElementById('ui-panel').style.display = 'block';
+                    document.getElementById('instructions').style.display = 'block';
+                }, 500);
+            }
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                document.getElementById('status-text').innerText = "Conectado ✅";
+                document.getElementById('status-text').style.color = "#00ff88";
+
+                const landmarks = results.multiHandLandmarks;
+                
+                // Rotación
+                let cx = 0, cy = 0;
+                landmarks.forEach(h => { cx += h[9].x; cy += h[9].y; });
+                cx /= landmarks.length; cy /= landmarks.length;
+                targetRotY = (cx - 0.5) * 5;
+                targetRotX = (cy - 0.5) * 5;
+
+                // Zoom
+                if (landmarks.length === 2) {
+                    const d = Math.hypot(landmarks[0][0].x - landmarks[1][0].x, landmarks[0][0].y - landmarks[1][0].y);
+                    targetCamZ = THREE.MathUtils.mapLinear(d, 0.2, 0.6, 60, 10);
+                }
+
+                // Tensión
+                let tension = 0;
+                landmarks.forEach(h => {
+                    const d = Math.hypot(h[0].x - h[12].x, h[0].y - h[12].y);
+                    tension += THREE.MathUtils.mapLinear(d, 0.4, 0.15, 0, 1);
+                });
+                handTension = THREE.MathUtils.lerp(handTension, THREE.MathUtils.clamp(tension, 0, 1), 0.1);
+            } else {
+                document.getElementById('status-text').innerText = "Esperando manos...";
+                document.getElementById('status-text').style.color = "#fff";
+                handTension = THREE.MathUtils.lerp(handTension, 0, 0.1);
+            }
+        });
+
+        // --- BOTÓN DE INICIO (SIN BLOQUEO MANUAL) ---
+        startBtn.addEventListener('click', () => {
+            startBtn.style.display = 'none';
+            loadingText.style.display = 'block';
+            errorMsg.style.display = 'none';
+
+            const cameraObj = new Camera(videoElement, {
+                onFrame: async () => { await hands.send({image: videoElement}); },
+                width: 640, height: 480,
+                facingMode: 'user' 
+            });
+
+            cameraObj.start().catch(err => {
+                console.error(err);
+                loadingText.style.display = 'none';
+                startBtn.style.display = 'block';
+                errorMsg.style.display = 'block';
+                
+                // Mensaje inteligente según el error
+                if (location.protocol === 'file:') {
+                    errorMsg.innerHTML = "⚠️ <b>Error de Navegador:</b> Los navegadores bloquean la cámara en archivos locales (file://).<br><br><b>Solución:</b> Usa una extensión como 'Web Server for Chrome' o sube el archivo a internet.";
+                } else {
+                    errorMsg.innerText = "⚠️ No se pudo acceder a la cámara. Asegúrate de dar permiso y que ninguna otra app la esté usando.";
+                }
+            });
+        });
+
+        // --- ANIMACIÓN ---
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = clock.getElapsedTime();
+            const pos = particles.geometry.attributes.position.array;
+
+            currentCamZ = THREE.MathUtils.lerp(currentCamZ, targetCamZ, 0.05);
+            camera.position.z = currentCamZ;
+            
+            currentRotX = THREE.MathUtils.lerp(currentRotX, targetRotX, 0.05);
+            currentRotY = THREE.MathUtils.lerp(currentRotY, targetRotY, 0.05);
+            
+            particles.rotation.y = currentRotY + time * 0.1;
+            particles.rotation.x = currentRotX;
+
+            const collapse = 1.0 - (handTension * 0.95);
+
+            for(let i=0; i<PARTICLE_COUNT; i++) {
+                const ix = i*3, iy = i*3+1, iz = i*3+2;
+                
+                let tx = targetPositions[ix] + Math.sin(time + targetPositions[iy]*0.1)*0.2;
+                let ty = targetPositions[iy] + Math.cos(time + targetPositions[ix]*0.1)*0.2;
+                let tz = targetPositions[iz];
+
+                pos[ix] += (tx * collapse - pos[ix]) * 0.08;
+                pos[iy] += (ty * collapse - pos[iy]) * 0.08;
+                pos[iz] += (tz * collapse - pos[iz]) * 0.08;
+            }
+            particles.geometry.attributes.position.needsUpdate = true;
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+    </script>
+</body>
+</html>
